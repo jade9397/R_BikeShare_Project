@@ -1,0 +1,293 @@
+---
+title: "BikeShare_CaseStudy"
+author: "Jade"
+date: "2023-05-02"
+output: html_document
+---
+Basic information on fictional Cyclistic Bike-Share company
+* 5,800 bicycles and 600 docking Stations.
+* Bike types: reclining bikes, hand tricycles, and cargo bikes
+* Rider types: casual riders:1). purchase single-ride or full-day passes/70%
+ My dataset is from May 2021 to April 2022, 12 months total.
+
+
+Cyclistic’s finance analysts have concluded that annual members are much more profitable than casual riders. 
+
+A bike-share company can navigate speedy success by focusing on maximizing the number of annual memberships - convert casual riders into annual members.. This can be achieved by understanding how casual riders and annual members use the bikes differently, and designing a new marketing strategy to convert casual riders into annual members.
+
+
+
+```
+**Load Packages**
+
+```{r}
+
+library(tidyverse)
+library(skimr)
+library(janitor)
+library(lubridate)
+```
+
+
+**create new project folder, then import 12 datasets**
+
+```{r}
+
+data1 <- read.csv("BS_204.csv")
+data2 <- read.csv("BS_205.csv")
+data3 <- read.csv("BS_206.csv")
+data4 <- read.csv("BS_207.csv")
+data5 <- read.csv("BS_208.csv")
+data6 <- read.csv("BS_209.csv")
+data7 <- read.csv("BS_210.csv")
+data8 <- read.csv("BS_211.csv")
+data9 <- read.csv("BS_212.csv")
+data10 <- read.csv("BS_2101.csv")
+data11 <- read.csv("BS_2102.csv")
+data12 <- read.csv("BS_2103.csv")
+```
+
+**the column names and data types must be the same across all datasets to use rbind()**
+```{r}
+colnames(data1)
+colnames(data2)
+colnames(data3)
+colnames(data4)
+colnames(data5)
+colnames(data6)
+colnames(data7)
+colnames(data8)
+colnames(data9)
+colnames(data10)
+colnames(data11)
+colnames(data12)
+
+```
+
+```{r}
+
+head(data1)
+head(data2)
+head(data3)
+head(data4)
+head(data5)
+head(data6)
+head(data7)
+head(data8)
+head(data9)
+head(data10)
+head(data11)
+head(data12)
+```
+
+
+**combine 12 datasets to use rbind()**
+```{r}
+
+whole_year_df <- rbind(data1, data2,data3,data4, data5, data6, data7, data8, data9, data10, data11, data12)
+```
+
+**trim colums from the data frame. efficient the analysis**
+```{r}
+
+trimed_df <- whole_year_df %>% 
+  select("rideable_type", "started_at", "ended_at","member_casual")
+  ```
+```{r}
+
+str(trimed_df)
+dim(trimed_df)
+table(trimed_df$rideable_type)
+```
+
+**convert the date formate**
+```{r}
+
+trimed_df$started_at <- mdy_hms(trimed_df$started_at)
+
+trimed_df$ended_at <- mdy_hms(trimed_df$ended_at)
+
+str(trimed_df)
+```
+
+
+**change type from chr to date**
+```{r}
+trimed_df$date <- as.Date(trimed_df$started_at)
+class(trimed_df$started_at)
+#extract month
+trimed_df$month <- format(trimed_df$started_at, "%m")
+
+```
+
+
+**ride-length**
+```{r}
+
+trimed_df <- trimed_df %>% 
+    mutate(ride_length = difftime(trimed_df$ended_at, trimed_df$started_at, units = "mins")) 
+```
+    
+
+**Mark the day of the week for each ride in the "started_at" column**
+```{r}
+trimed_df$weekday <- wday(trimed_df$started_at, label = TRUE)
+
+```
+**check the dataset is all the columns look right
+
+```{r}
+head(trimed_df)
+```
+
+
+**ride_length_summary and round up to minutes and more than 1 minute**
+**Group the data frame by member_casual and weekday, and calculate summary statistics**
+```{r}
+
+ride_length_summary <- trimed_df %>% 
+  filter(ended_at >= started_at & ride_length > as.difftime(1, units = "mins")) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarize(avg_ride_length = ceiling(mean(ride_length)),
+            median_ride_length = ceiling(median(ride_length, na.rm = TRUE)),
+            num_rides = n())
+
+```
+
+**View the summary statistics by weekdays**
+
+```{r}
+ride_length_summary
+```
+
+
+**Create a bar chart of average ride length by weekday and member_casual**
+```{r}
+
+
+ggplot(data = ride_length_summary, aes(x = weekday, y = avg_ride_length, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Average Ride Length by Weekday and User Type",
+       x = "Weekday",
+       y = "Average Ride Length (minutes)",
+       fill = "Rider Type") +
+  theme_minimal()
+  
+```
+  
+
+**Create a line chart of average number of ride  by weekday and member_casual**
+
+```{r}
+
+num_rides_summary <- trimed_df %>%
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarize(num_rides = n()) %>% 
+  arrange(member_casual, weekday) %>%
+  ggplot(aes(x = weekday, y = num_rides, fill = member_casual)) +
+  geom_line(aes(x = weekday, y = num_rides, color = member_casual, group = member_casual)) +
+  geom_point(size=3)+
+  theme_bw()+
+  labs(title = "Riders Time Usage",
+       x = "Weekday",
+       y = "Total Rides",
+       fill = "Rider Type",
+       color = "Rider Type") 
+  
+
+num_rides_summary
+
+```
+
+
+**Create a bar chart of average ride length by 12 months and member_casual**
+```{r}
+
+
+ride_length_summary <- trimed_df %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  filter(ended_at >= started_at & ride_length > as.difftime(1, units = "mins")) %>% 
+  group_by(member_casual, month) %>% 
+  summarize(avg_ride_length = ceiling(mean(ride_length)),
+            median_ride_length = ceiling(median(ride_length, na.rm = TRUE)),
+            num_rides = n()) %>% 
+  arrange(member_casual, month) %>%
+  ggplot(aes(x = month, y = avg_ride_length, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Average Ride Length by Month and User Type",
+       x = "Month",
+       y = "Average Ride Length (seconds)",
+       fill = "Rider Type") +
+  theme_minimal()
+
+ride_length_summary
+
+```
+**Create a line chart of total number of ride  by month and rider type**
+
+```{r}
+
+num_rides_summary <- trimed_df %>%
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, month) %>% 
+  summarize(num_rides = n()) %>% 
+  arrange(member_casual, month) %>%
+  ggplot(aes(x = month, y = num_rides, fill = member_casual)) +
+  geom_line(aes(color = member_casual, group = member_casual)) +
+  geom_point(size = 3) +
+  theme_bw() +
+  labs(title = "Riders Time Usage",
+       x = "Month",
+       y = "Total Rides",
+       fill = "Rider Type",
+       color = "Rider Type") 
+
+num_rides_summary
+
+
+```
+
+
+##**Conclusion**##
+
+Based on the analysis, members primarily use the bikeshare for commuting and tasks while casual riders use it on weekends for excerse and recreasion. we can see that the average ride length varies by user type in month and week. 
+
+* convert annuel members is difficult task!
+* could create veriaty passes to attact more casual riders or encourage them to use more rides: peak season veriaty passes, 1 month, 2 months and 3 months pass or group rental pass; off hour special; 10 trips pass ... to attract more riders to increate revenue
+* to put more ads through social midia to promote bikeshare program viserbility
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
